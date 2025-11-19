@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+
+# Distribution / Build
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Logs
+logs/
+notebooks/logs/
+*.log
+
+# IDE
+.vscode/
+.idea/
+
