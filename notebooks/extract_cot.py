@@ -132,8 +132,8 @@ def print_cot(cot_data: Dict[str, Any], show_full_answer: bool = False):
                     print(f"    Signature: {r.get('signature', 'N/A')}")
                 else:
                     reasoning_text = r.get('content', '')
-                    if len(reasoning_text) > 500:
-                        print(f"  - {reasoning_text[:500]}...")
+                    if len(reasoning_text) > 5000:
+                        print(f"  - {reasoning_text[:5000]}...")
                         print(f"    (truncated, total length: {len(reasoning_text)})")
                     else:
                         print(f"  - {reasoning_text}")
@@ -142,8 +142,8 @@ def print_cot(cot_data: Dict[str, Any], show_full_answer: bool = False):
         if turn.get('text'):
             text = turn['text']
             print("\n[TEXT]:")
-            if len(text) > 1000 and not show_full_answer:
-                print(text[:1000])
+            if len(text) > 50000 and not show_full_answer:
+                print(text[:50000])
                 print(f"\n... (truncated, total length: {len(text)} chars)")
             else:
                 print(text)

@@ -284,15 +284,20 @@ def find_code(completion: str) -> str:
     Returns:
         Extracted code string
     """
-    # Try to find code in markdown blocks
+    # First, find all ```python blocks
     pattern_1 = re.compile(r"```python\n(.*?)```", re.DOTALL)
-    pattern_2 = re.compile(r"```\n(.*?)```", re.DOTALL)
+    matches = pattern_1.findall(completion)
     
-    matches = pattern_1.findall(completion) + pattern_2.findall(completion)
+    # Remove matched ```python blocks from completion to avoid double-matching
+    temp_completion = pattern_1.sub("", completion)
+    
+    # Then find remaining ``` blocks (without python tag)
+    pattern_2 = re.compile(r"```\n(.*?)```", re.DOTALL)
+    matches += pattern_2.findall(temp_completion)
     
     if matches:
         # Use the last code block found
-        return matches[-1]
+        return matches[-1].strip()
     else:
         # Return the whole completion if no code blocks found
         return completion
