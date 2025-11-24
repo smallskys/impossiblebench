@@ -7,12 +7,14 @@
 - 推理过程（reasoning tokens）- 如果可用且未加密
 - 最终代码答案
 - 任务元数据和成功状态
+python notebooks/extract_cot.py --latest
 """
 
 import json
 from pathlib import Path
 from typing import Dict, List, Any
 import argparse
+from datetime import datetime
 
 
 def extract_sample_cot(sample: Dict[str, Any]) -> Dict[str, Any]:
@@ -162,6 +164,66 @@ def print_cot(cot_data: Dict[str, Any], show_full_answer: bool = False):
                 print(f"  {key}: {value}")
 
 
+def find_log_files(log_dir: Path = None) -> List[Path]:
+    """查找所有日志文件"""
+    if log_dir is None:
+        # 默认日志目录
+        script_dir = Path(__file__).parent
+        log_dir = script_dir / 'logs' / 'implivecodebench'
+    
+    if not log_dir.exists():
+        return []
+    
+    # 查找所有 JSON 文件，排除 logs.json 和 eval-set.json
+    log_files = []
+    for f in log_dir.glob('*.json'):
+        if f.name not in ['logs.json', 'eval-set.json']:
+            log_files.append(f)
+    
+    # 按修改时间排序（最新的在前）
+    log_files.sort(key=lambda x: x.stat().st_mtime, reverse=True)
+    return log_files
+
+
+def select_log_file(log_files: List[Path]) -> Path:
+    """让用户选择一个日志文件"""
+    if not log_files:
+        print("错误: 未找到日志文件")
+        return None
+    
+    print("\n可用的日志文件:")
+    print("=" * 80)
+    for i, log_file in enumerate(log_files, 1):
+        # 获取文件大小和修改时间
+        size_mb = log_file.stat().st_size / (1024 * 1024)
+        mtime = log_file.stat().st_mtime
+        mtime_str = datetime.fromtimestamp(mtime).strftime('%Y-%m-%d %H:%M:%S')
+        
+        print(f"{i}. {log_file.name}")
+        print(f"   大小: {size_mb:.2f} MB | 修改时间: {mtime_str}")
+    
+    print(f"\n0. 使用最新的日志文件 ({log_files[0].name})")
+    print("=" * 80)
+    
+    while True:
+        try:
+            choice = input("\n请选择日志文件编号 (0 或 1-{}，直接回车使用最新): ".format(len(log_files)))
+            if choice == '':
+                choice = '0'
+            choice = int(choice)
+            if choice == 0:
+                return log_files[0]
+            elif 1 <= choice <= len(log_files):
+                return log_files[choice - 1]
+            else:
+                print(f"请输入 0 到 {len(log_files)} 之间的数字")
+        except ValueError:
+            print("请输入有效的数字")
+        except KeyboardInterrupt:
+            print("\n已取消")
+            return None
+
+
 def main():
     parser = argparse.ArgumentParser(
         description='提取 inspect_ai 日志中的 CoT 信息'
@@ -169,7 +231,8 @@ def main():
     parser.add_argument(
         'log_file',
         type=str,
-        help='日志文件路径（JSON 格式）'
+        nargs='?',  # 改为可选参数
+        help='日志文件路径（JSON 格式）。如果不提供，将自动搜索并让你选择'
     )
     parser.add_argument(
         '--success-only',
@@ -186,16 +249,53 @@ def main():
         type=str,
         help='输出到 JSON 文件'
     )
+    parser.add_argument(
+        '--latest',
+        action='store_true',
+        help='自动使用最新的日志文件（不提示选择）'
+    )
+    parser.add_argument(
+        '--log-dir',
+        type=str,
+        help='指定日志目录（默认为 notebooks/logs/implivecodebench/）'
+    )
     
     args = parser.parse_args()
     
-    log_file = Path(args.log_file)
-    if not log_file.exists():
-        print(f"错误: 文件不存在: {log_file}")
-        return
+    # 确定日志文件
+    if args.log_file:
+        # 用户指定了文件
+        log_file = Path(args.log_file)
+        if not log_file.exists():
+            print(f"错误: 文件不存在: {log_file}")
+            return
+    else:
+        # 自动搜索日志文件
+        log_dir = Path(args.log_dir) if args.log_dir else None
+        log_files = find_log_files(log_dir)
+        
+        if not log_files:
+            print("错误: 未找到日志文件")
+            if log_dir:
+                print(f"搜索目录: {log_dir}")
+            else:
+                script_dir = Path(__file__).parent
+                default_dir = script_dir / 'logs' / 'implivecodebench'
+                print(f"搜索目录: {default_dir}")
+            return
+        
+        if args.latest:
+            # 自动使用最新的日志
+            log_file = log_files[0]
+            print(f"使用最新的日志文件: {log_file.name}")
+        else:
+            # 让用户选择
+            log_file = select_log_file(log_files)
+            if log_file is None:
+                return
     
     # 提取 CoT
-    print(f"正在从 {log_file} 提取 CoT...")
+    print(f"\n正在从 {log_file.name} 提取 CoT...")
     cot_results = extract_cot_from_log(log_file)
     
     # 过滤成功的任务
